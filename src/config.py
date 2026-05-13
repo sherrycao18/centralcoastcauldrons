@@ -8,6 +8,25 @@ load_dotenv(dotenv_path="default.env", override=False)
 # Then override with .env if available
 load_dotenv(dotenv_path=find_dotenv(".env"), override=True)
 
+def normalize_postgres_uri(uri: str) -> str:
+    """
+    Normalize common Postgres URL schemes to the driver we ship (psycopg v3).
+
+    Render/Supabase UIs often provide `postgres://` or `postgresql://` URLs.
+    SQLAlchemy treats those as the legacy default driver (psycopg2) unless the
+    driver is specified explicitly.
+    """
+    cleaned = uri.strip()
+    if cleaned.startswith("postgresql+psycopg://"):
+        return cleaned
+    if cleaned.startswith("postgresql+psycopg2://"):
+        return "postgresql+psycopg://" + cleaned.removeprefix("postgresql+psycopg2://")
+    if cleaned.startswith("postgres://"):
+        return "postgresql+psycopg://" + cleaned.removeprefix("postgres://")
+    if cleaned.startswith("postgresql://"):
+        return "postgresql+psycopg://" + cleaned.removeprefix("postgresql://")
+    return cleaned
+
 
 class Settings:
     API_KEY: str | None = os.getenv("API_KEY")
@@ -18,6 +37,7 @@ class Settings:
             raise ValueError("API_KEY is missing in the environment variables.")
         if not self.POSTGRES_URI:
             raise ValueError("POSTGRES_URI is missing in the environment variables.")
+        self.POSTGRES_URI = normalize_postgres_uri(self.POSTGRES_URI)
 
 
 @lru_cache()

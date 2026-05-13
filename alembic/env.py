@@ -4,34 +4,37 @@ import os
 from sqlalchemy import create_engine, pool
 from alembic import context
 
-# Prefer using the same POSTGRES_URI normalization as the app.
-try:
-    from src.config import normalize_postgres_uri
-except Exception:  # pragma: no cover
-    def normalize_postgres_uri(uri: str) -> str:
-        cleaned = uri.strip()
-        if cleaned.startswith("postgresql+psycopg://"):
-            return cleaned
-        if cleaned.startswith("postgresql+psycopg2://"):
-            return "postgresql+psycopg://" + cleaned.removeprefix("postgresql+psycopg2://")
-        if cleaned.startswith("postgres://"):
-            return "postgresql+psycopg://" + cleaned.removeprefix("postgres://")
-        if cleaned.startswith("postgresql://"):
-            return "postgresql+psycopg://" + cleaned.removeprefix("postgresql://")
-        return cleaned
-
 # Alembic Config object
 config = context.config
 
 
+def normalize_postgres_uri(uri: str) -> str:
+    """Match driver to psycopg v3 (avoid SQLAlchemy defaulting to psycopg2)."""
+    cleaned = uri.strip()
+    if cleaned.startswith("postgresql+psycopg://"):
+        out = cleaned
+    elif cleaned.startswith("postgresql+psycopg2://"):
+        out = "postgresql+psycopg://" + cleaned.removeprefix("postgresql+psycopg2://")
+    elif cleaned.startswith("postgres://"):
+        out = "postgresql+psycopg://" + cleaned.removeprefix("postgres://")
+    elif cleaned.startswith("postgresql://"):
+        out = "postgresql+psycopg://" + cleaned.removeprefix("postgresql://")
+    else:
+        out = cleaned
+    # Supabase expects TLS; pooler URLs often omit sslmode.
+    if "supabase" in out and "sslmode=" not in out:
+        sep = "&" if "?" in out else "?"
+        out = f"{out}{sep}sslmode=require"
+    return out
+
+
 def get_database_url() -> str:
     """POSTGRES_URI must not go through ConfigParser: URLs often contain %xx escapes."""
-    return normalize_postgres_uri(
-        os.getenv(
-            "POSTGRES_URI",
-            "postgresql+psycopg://myuser:mypassword@localhost/mydatabase",
-        )
+    raw = os.getenv(
+        "POSTGRES_URI",
+        "postgresql+psycopg://myuser:mypassword@localhost/mydatabase",
     )
+    return normalize_postgres_uri(raw)
 
 # Set up logging
 if config.config_file_name is not None:

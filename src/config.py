@@ -18,14 +18,19 @@ def normalize_postgres_uri(uri: str) -> str:
     """
     cleaned = uri.strip()
     if cleaned.startswith("postgresql+psycopg://"):
-        return cleaned
-    if cleaned.startswith("postgresql+psycopg2://"):
-        return "postgresql+psycopg://" + cleaned.removeprefix("postgresql+psycopg2://")
-    if cleaned.startswith("postgres://"):
-        return "postgresql+psycopg://" + cleaned.removeprefix("postgres://")
-    if cleaned.startswith("postgresql://"):
-        return "postgresql+psycopg://" + cleaned.removeprefix("postgresql://")
-    return cleaned
+        out = cleaned
+    elif cleaned.startswith("postgresql+psycopg2://"):
+        out = "postgresql+psycopg://" + cleaned.removeprefix("postgresql+psycopg2://")
+    elif cleaned.startswith("postgres://"):
+        out = "postgresql+psycopg://" + cleaned.removeprefix("postgres://")
+    elif cleaned.startswith("postgresql://"):
+        out = "postgresql+psycopg://" + cleaned.removeprefix("postgresql://")
+    else:
+        out = cleaned
+    if "supabase" in out and "sslmode=" not in out:
+        sep = "&" if "?" in out else "?"
+        out = f"{out}{sep}sslmode=require"
+    return out
 
 
 class Settings:
